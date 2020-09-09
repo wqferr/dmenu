@@ -1,0 +1,2 @@
+Apply grid patch WITHOUT --rej
+Actually install this dmenu instead of the one from aur
