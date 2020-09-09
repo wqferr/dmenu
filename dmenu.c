@@ -39,7 +39,7 @@ struct item {
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
-static int centered = 0;
+static int centered = 1;
 static int min_width = 500;
 static int inputw = 0, promptw;
 static int lrpad; /* sum of left and right padding */
