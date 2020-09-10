@@ -26,6 +26,8 @@
 #define LENGTH(X)             (sizeof X / sizeof X[0])
 #define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
 
+#define OPAQUE (0xFFU)
+
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeNormHighlight, SchemeSelHighlight,
        SchemeOut, SchemeLast }; /* color schemes */
@@ -41,8 +43,6 @@ struct item {
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
-static int centered = 1;
-static int min_width = 500;
 static int inputw = 0, promptw;
 static int lrpad; /* sum of left and right padding */
 static size_t cursor;
@@ -50,6 +50,11 @@ static struct item *items = NULL;
 static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int mon = -1, screen;
+
+static int useargb = 0;
+static Visual *visual;
+static int depth;
+static Colormap cmap;
 
 static Atom clip, utf8;
 static Display *dpy;
@@ -63,6 +68,7 @@ static Clr *scheme[SchemeLast];
 
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
 static char *(*fstrstr)(const char *, const char *) = strstr;
+static void xinitvisual();
 
 static void
 appenditem(struct item *item, struct item **list, struct item **last)
@@ -744,7 +750,7 @@ setup(void)
 #endif
 	/* init appearance */
 	for (j = 0; j < SchemeLast; j++)
-		scheme[j] = drw_scm_create(drw, colors[j], 2);
+		scheme[j] = drw_scm_create(drw, colors[j], alphas[j], 2);
 
 	clip = XInternAtom(dpy, "CLIPBOARD",   False);
 	utf8 = XInternAtom(dpy, "UTF8_STRING", False);
@@ -815,9 +821,12 @@ setup(void)
 	swa.override_redirect = True;
 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+	swa.background_pixel = 0;
+	swa.border_pixel = 0;
+	swa.colormap = cmap;
 	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, border_width,
-	                    CopyFromParent, CopyFromParent, CopyFromParent,
-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+	                    depth, InputOutput, visual,
+	                    CWOverrideRedirect | CWBackPixel | CWBorderPixel | CWColormap | CWEventMask, &swa);
 	XSetWindowBorder(dpy, win, scheme[SchemeSel][ColBg].pixel);
 	XSetClassHint(dpy, win, &ch);
 
@@ -850,6 +859,43 @@ usage(void)
 	      "             [-nb color] [-nf color] [-sb color] [-sf color]\n"
 	      "             [-nhb color] [-nhf color] [-shb color] [-shf color] [-w windowid]\n", stderr);
 	exit(1);
+}
+
+void
+xinitvisual()
+{
+   XVisualInfo *infos;
+   XRenderPictFormat *fmt;
+   int nitems;
+   int i;
+
+   XVisualInfo tpl = {
+       .screen = screen,
+       .depth = 32,
+       .class = TrueColor
+   };
+   long masks = VisualScreenMask | VisualDepthMask | VisualClassMask;
+
+   infos = XGetVisualInfo(dpy, masks, &tpl, &nitems);
+   visual = NULL;
+   for(i = 0; i < nitems; i ++) {
+       fmt = XRenderFindVisualFormat(dpy, infos[i].visual);
+       if (fmt->type == PictTypeDirect && fmt->direct.alphaMask) {
+           visual = infos[i].visual;
+           depth = infos[i].depth;
+           cmap = XCreateColormap(dpy, root, visual, AllocNone);
+           useargb = 1;
+           break;
+       }
+   }
+
+   XFree(infos);
+
+   if (! visual) {
+       visual = DefaultVisual(dpy, screen);
+       depth = DefaultDepth(dpy, screen);
+       cmap = DefaultColormap(dpy, screen);
+   }
 }
 
 int
@@ -917,7 +963,8 @@ main(int argc, char *argv[])
 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
 		die("could not get embedding window attributes: 0x%lx",
 		    parentwin);
-	drw = drw_create(dpy, screen, root, wa.width, wa.height);
+	xinitvisual();
+	drw = drw_create(dpy, screen, root, wa.width, wa.height, visual, depth, cmap);
 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
 		die("no fonts could be loaded.");
 	lrpad = drw->fonts->h;

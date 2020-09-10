@@ -1,0 +1,1 @@
+https://raw.githubusercontent.com/Baitinq/dmenu/master/patches/dmenu-opacity.diff
