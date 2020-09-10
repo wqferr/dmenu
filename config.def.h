@@ -33,8 +33,8 @@ static const unsigned int alphas[][3] = {
 };
 
 /* -l and -g options; controls number of lines and columns in grid if > 0 */
-static unsigned int lines = 0;
-static unsigned int columns = 0;
+static unsigned int lines = 4;
+static unsigned int columns = 3;
 
 /*
  * Characters not considered part of a word while deleting words
