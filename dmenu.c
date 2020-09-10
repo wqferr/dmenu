@@ -363,7 +363,9 @@ fuzzymatch(void)
 		qsort(fuzzymatches, number_of_matches, sizeof(struct item*), compare_distance);
 		/* rebuild list of matches */
 		matches = matchend = NULL;
-		for (i = 0, it = fuzzymatches[i];  i < number_of_matches && it && \
+		if (number_of_matches > i)
+			it = fuzzymatches[i];
+		for (i = 0;  i < number_of_matches && it && \
 				it->text; i++, it = fuzzymatches[i]) {
 			appenditem(it, &matches, &matchend);
 		}
